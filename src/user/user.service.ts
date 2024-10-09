@@ -1,4 +1,8 @@
-import { ConflictException, Injectable } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { PrismaService } from 'src/prisma.service';
@@ -28,6 +32,8 @@ export class UserService {
 
     createUserDto['senha'] = await bcrypt.hash(createUserDto.senha, 10);
 
+    delete createUserDto.confirmarSenha;
+
     const user = await this.prisma.user.create({
       data: createUserDto,
     });
@@ -41,25 +47,43 @@ export class UserService {
   }
 
   async findOne(id: string): Promise<User> {
-    const idExists = await this.prisma.user.findUnique({ where: { id: id } });
+    const user = await this.echoservice.findUserById(id);
 
-    if (!idExists) {
-      throw new ConflictException('Usuário não encontrado');
-    }
+    delete user.senha;
 
-    return idExists;
+    return user;
   }
 
   async update(id: string, updateUserDto: UpdateUserDto): Promise<User> {
-    await this.echoservice.findUserByEmail(updateUserDto.email);
+    // verificando se o email existe
+    await this.echoservice.emailValid(updateUserDto.email);
+    // verificando se id existe
     await this.echoservice.findUserById(id);
-    await this.echoservice.comparePasswords(updateUserDto.senha, id);
 
-    if (updateUserDto.senha !== updateUserDto.confirmarSenha) {
-      throw new ConflictException('Senhas não conferem');
+    if (updateUserDto.atualsenha) {
+      await this.echoservice.comparePasswords(updateUserDto.atualsenha, id);
+
+      if (updateUserDto.novaSenha !== updateUserDto.confirmarSenha) {
+        throw new ConflictException('Senhas não conferem');
+      }
+
+      updateUserDto['novaSenha'] = await bcrypt.hash(
+        updateUserDto.novaSenha,
+        10,
+      );
+
+      const user = await this.prisma.user.update({
+        where: { id: id },
+        data: {
+          nome: updateUserDto.nome,
+          email: updateUserDto.email,
+          senha: updateUserDto.novaSenha,
+        },
+      });
+      delete user.senha;
+
+      return user;
     }
-
-    updateUserDto['senha'] = await bcrypt.hash(updateUserDto.senha, 10);
 
     const user = await this.prisma.user.update({
       where: { id: id },
@@ -71,7 +95,11 @@ export class UserService {
     return;
   }
 
-  remove(id: number) {
-    return `This action removes a #${id} user`;
+  async remove(id: string): Promise<User> {
+    await this.echoservice.findUserById(id);
+
+    return await this.prisma.user.delete({
+      where: { id: id },
+    });
   }
 }
