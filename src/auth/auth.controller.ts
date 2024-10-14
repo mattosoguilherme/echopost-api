@@ -7,6 +7,9 @@ import {
   Param,
   Delete,
   UseGuards,
+  Redirect,
+  Query,
+  Res,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
@@ -17,6 +20,7 @@ import { AuthGuard } from '@nestjs/passport';
 import { RolesGuard } from './guards/roles.guard';
 import Logged from './decorators/logged.decorator';
 import { User } from '@prisma/client';
+import { Response } from 'express';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -34,5 +38,24 @@ export class AuthController {
   @ApiBearerAuth()
   me(@Logged() user: User) {
     return user;
+  }
+
+  @Get('youtube')
+  @Redirect()
+  getYoutubeAuth() {
+    const url = this.authService.getYoutubeAuthUrl();
+
+    return { url };
+  }
+
+  @Get('youtube/callback')
+  async youtubeCallback(@Query('code') code: string, @Res() res: Response) {
+    try {
+      const tokenData = await this.authService.getYoutubeToken(code);
+
+      res.json(tokenData);
+    } catch (error) {
+      res.status(error.getStatus()).json({ message: error.message });
+    }
   }
 }
