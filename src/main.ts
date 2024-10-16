@@ -6,7 +6,7 @@ import { AppModule } from './app.module';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  const port = 3004;
+  const port = process.env.PORT || 2589;
 
   app.enableCors();
   app.useGlobalPipes(new ValidationPipe());
@@ -22,7 +22,7 @@ async function bootstrap() {
     const document = SwaggerModule.createDocument(app, config);
     SwaggerModule.setup('api', app, document);
 
-  await app.listen(process.env.PORT || port, () => { console.log(`Server is running on port http://localhost:${port}/api`) });
+  await app.listen(port, () => { console.log(`Server is running on port http://localhost:${port}/api`) });
   
 }
 bootstrap().catch(err => console.error(`ERRO: ${err}`));
